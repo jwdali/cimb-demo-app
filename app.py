@@ -4,7 +4,7 @@ import pymysql
 
 app = Flask(__name__)
 
-VERSION = "2.0"
+VERSION = "1.0"
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
