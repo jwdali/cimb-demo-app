@@ -14,24 +14,34 @@ HTML_TEMPLATE = """
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', sans-serif; background: #f4f6f9; color: #333; }
-        .header { background: #1a237e; color: white; padding: 24px 32px; }
-        .header h1 { font-size: 22px; font-weight: 600; }
-        .version-badge {
-            display: inline-block; background: #43a047; color: white;
-            padding: 4px 14px; border-radius: 12px; font-size: 13px; margin-left: 12px;
+        .header { background: #1a237e; color: white; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .container { max-width: 860px; margin: 24px auto; padding: 0 16px; }
+
+        /* Version Card - the star of the demo */
+        .version-card {
+            border-radius: 10px; padding: 28px 32px; margin-bottom: 24px;
+            color: white; display: flex; align-items: center; gap: 32px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
-        .container { max-width: 800px; margin: 32px auto; padding: 0 16px; }
+        .version-number { font-size: 56px; font-weight: 800; line-height: 1; }
+        .version-number span { font-size: 18px; font-weight: 400; display: block; opacity: 0.85; margin-bottom: 4px; letter-spacing: 1px; text-transform: uppercase; }
+        .version-meta { font-size: 13px; line-height: 1.8; opacity: 0.9; }
+        .version-meta strong { opacity: 1; }
+        .version-divider { width: 2px; height: 72px; background: rgba(255,255,255,0.3); border-radius: 1px; }
+
+        /* Standard cards */
         .card {
             background: white; border-radius: 8px; padding: 24px;
             box-shadow: 0 1px 4px rgba(0,0,0,0.1); margin-bottom: 20px;
         }
-        .card h2 { font-size: 16px; color: #555; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card h2 { font-size: 15px; color: #555; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
         table { width: 100%; border-collapse: collapse; }
         th { background: #e8eaf6; text-align: left; padding: 10px 14px; font-size: 13px; color: #333; }
         td { padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 14px; }
         .env-info { font-size: 13px; color: #777; }
         .env-info span { color: #1a237e; font-weight: 600; }
-        .error { color: #c62828; background: #ffebee; padding: 16px; border-radius: 6px; }
+        .error { color: #c62828; background: #ffebee; padding: 16px; border-radius: 6px; font-size: 14px; }
         .success { color: #2e7d32; font-size: 13px; margin-bottom: 12px; }
         .footer { text-align: center; padding: 24px; font-size: 12px; color: #999; }
         .add-form { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
@@ -58,7 +68,8 @@ HTML_TEMPLATE = """
 </head>
 <body>
     <div class="header">
-        <h1>Alibaba Cloud CI/CD Demo Application <span class="version-badge">v{{ version }}</span></h1>
+        <h1>Alibaba Cloud CI/CD Demo</h1>
+        <div style="font-size: 13px; opacity: 0.8;">{{ hostname }}</div>
     </div>
     <div class="container">
 
@@ -66,14 +77,18 @@ HTML_TEMPLATE = """
         <div class="flash {{ flash_class }}">{{ flash_msg }}</div>
         {% endif %}
 
-        <div class="card">
-            <h2>Environment</h2>
-            <p class="env-info">
-                Database Host: <span>{{ db_host }}</span><br>
-                Database Name: <span>{{ db_name }}</span><br>
-                Database User: <span>{{ db_user }}</span><br>
-                Container Hostname: <span>{{ hostname }}</span>
-            </p>
+        <div class="version-card" style="background: {{ version_color }};">
+            <div class="version-number">
+                <span>Version</span>
+                v{{ version }}
+            </div>
+            <div class="version-divider"></div>
+            <div class="version-meta">
+                <strong>Container:</strong> {{ hostname }}<br>
+                <strong>Database:</strong> {{ db_name }}@{{ db_host_short }}<br>
+                <strong>Environment:</strong> {{ app_env }}<br>
+                <strong>Pipeline:</strong> GitHub &rarr; ACR &rarr; ECI / ACK / ACS
+            </div>
         </div>
 
         {% if error %}
@@ -126,6 +141,18 @@ HTML_TEMPLATE = """
 """
 
 
+def get_version_color(version_str):
+    """Return a colour that changes per major version for visual CI/CD proof."""
+    colors = {
+        "1": "#1565c0",   # blue
+        "2": "#2e7d32",   # green
+        "3": "#e65100",   # orange
+        "4": "#6a1b9a",   # purple
+    }
+    major = version_str.split(".")[0]
+    return colors.get(major, "#455a64")
+
+
 def get_db_connection():
     return pymysql.connect(
         host=os.environ.get("DB_HOST", ""),
@@ -153,17 +180,23 @@ def index():
     db_name = os.environ.get("DB_NAME", "not set")
     db_user = os.environ.get("DB_USER", "not set")
     hostname = os.environ.get("HOSTNAME", "unknown")
+    app_env = os.environ.get("APP_ENV", "demo")
+    db_host_short = db_host.split(".")[0] if "." in db_host else db_host
+    version_color = get_version_color(VERSION)
 
     try:
         products = fetch_products()
         return render_template_string(
             HTML_TEMPLATE,
             version=VERSION,
+            version_color=version_color,
             products=products,
             db_host=db_host,
+            db_host_short=db_host_short,
             db_name=db_name,
             db_user=db_user,
             hostname=hostname,
+            app_env=app_env,
             error=None,
             flash_msg=request.args.get("msg"),
             flash_class="flash-success" if request.args.get("msg") else "",
@@ -172,11 +205,14 @@ def index():
         return render_template_string(
             HTML_TEMPLATE,
             version=VERSION,
+            version_color=version_color,
             products=[],
             db_host=db_host,
+            db_host_short=db_host_short,
             db_name=db_name,
             db_user=db_user,
             hostname=hostname,
+            app_env=app_env,
             error=str(e),
             flash_msg=None,
             flash_class="",
